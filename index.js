@@ -35,7 +35,8 @@ app.use(express.json());
 app.use(
   cors({
     // origin: ["https://book-courier-client-site.vercel.app"],
-    origin: ["http://localhost:5173"],
+    origin: ["http://localhost:5173", "https://book-curriter.vercel.app"],
+
     credentials: true,
     optionSuccessStatus: 200,
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -314,7 +315,6 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
 
-      // frontend থেকে পাঠানো field অনুযায়ী update
       const updateDoc = { $set: { status: req.body.status } };
 
       try {
@@ -326,7 +326,7 @@ async function run() {
     });
 
     //==== payment releted api ========//
-    app.post("/create-checkout-session", verifyJWT, async (req, res) => {
+    app.post("/create-checkout-session", async (req, res) => {
       const paymentInfo = req.body;
       const amount = parseInt(paymentInfo.price) * 100;
       const session = await stripe.checkout.sessions.create({
@@ -336,10 +336,9 @@ async function run() {
               currency: "usd",
               unit_amount: amount,
               product_data: {
-                name: paymentInfo.name,
+                name: paymentInfo.authorName,
               },
             },
-
             quantity: 1,
           },
         ],
@@ -350,13 +349,13 @@ async function run() {
         },
         // success_url: `http://localhost:5173/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         // cancel_url: `http://localhost:5173/dashboard/my-orders`,
-        success_url: `https://book-courier-client-site.vercel.app/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `https://book-courier-client-site.vercel.app/dashboard/my-orders`,
+        success_url: `https://book-curriter.vercel.app/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `https://book-curriter.vercel.app/dashboard/my-orders`,
       });
       res.send({ url: session.url });
     });
 
-    app.patch("/payment-success", verifyJWT, async (req, res) => {
+    app.patch("/payment-success", async (req, res) => {
       const sessionId = req.query.session_id;
 
       const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -365,7 +364,6 @@ async function run() {
 
       const books = await orderCollection.findOne(orderQuery);
 
-      // Already paid?
       const existingPayment = await paymentCollection.findOne({
         transationId: session.payment_intent,
       });
@@ -381,7 +379,7 @@ async function run() {
         const orderInfo = {
           orderId: orderId,
           transationId: session.payment_intent,
-          bookName: books.name,
+          bookName: books.bookName,
           authorName: books.authorName,
           authorEmail: books.authorEmail,
           customer_email: session.customer_email,
@@ -392,10 +390,6 @@ async function run() {
         };
 
         const result = await paymentCollection.insertOne(orderInfo);
-
-        // await bookCollection.updateOne(orderQuery, {
-        //   $inc: { stockQuantity: -1 },
-        // });
 
         await orderCollection.updateOne(orderQuery, {
           $set: { paymentStatus: session.payment_status },
