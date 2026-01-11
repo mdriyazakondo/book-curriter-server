@@ -474,6 +474,33 @@ async function run() {
       res.send({ insertedId: result.insertedId });
     });
 
+    // admin total book
+    app.get("/total-revenue", async (req, res) => {
+      const pipeline = [
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: "$price" },
+          },
+        },
+      ];
+
+      const result = await paymentCollection.aggregate(pipeline).toArray();
+
+      res.send({
+        totalRevenue: result[0]?.totalRevenue || 0,
+      });
+    });
+
+    app.get("/total-users", async (req, res) => {
+      const result = await userCollection
+        .find()
+        .sort({ create_date: -1 })
+        .limit(6)
+        .toArray();
+      res.send(result);
+    });
+
     // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
