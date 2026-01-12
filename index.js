@@ -172,7 +172,7 @@ async function run() {
       };
 
       if (search) {
-        filter.bookTitle = { $regex: search, $options: "i" };
+        filter.bookName = { $regex: search, $options: "i" };
       }
 
       let sortOption = {};
@@ -499,6 +499,53 @@ async function run() {
         .limit(6)
         .toArray();
       res.send(result);
+    });
+
+    app.get("/total-payment-result", async (req, res) => {
+      try {
+        const result = await paymentCollection
+          .aggregate([
+            {
+              $group: {
+                _id: {
+                  month: { $month: "$payment_date" },
+                  year: { $year: "$payment_date" },
+                },
+                totalAmount: { $sum: "$price" },
+                count: { $sum: 1 },
+              },
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } },
+          ])
+          .toArray();
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Error fetching data", error });
+      }
+    });
+
+    app.get("/total-user-result", async (req, res) => {
+      try {
+        const result = await userCollection
+          .aggregate([
+            {
+              $group: {
+                _id: {
+                  month: { $month: "$create_date" },
+                  year: { $year: "$create_date" },
+                },
+                totalUser: { $sum: 1 },
+              },
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } },
+          ])
+          .toArray();
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Error fetching users", error });
+      }
     });
 
     // await client.db("admin").command({ ping: 1 });
